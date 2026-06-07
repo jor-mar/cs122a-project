@@ -35,7 +35,6 @@ def print_table(rows):
     for r in rows:
         print(",".join(str(x) if x is not None else "NULL" for x in r))
 
-
 def out_bool(val):
     print("Success" if val else "Fail")
 
