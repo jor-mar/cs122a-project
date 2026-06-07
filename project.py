@@ -3,6 +3,7 @@ import mysql.connector
 import csv
 import os
 
+
 # helper functions
 
 def get_conn():
@@ -12,6 +13,23 @@ def get_conn():
         database='cs122a'
     )
 
+def execute_txn(fn):
+    conn = None
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+
+        result = fn(cur)
+
+        conn.commit()
+        conn.close()
+        return result
+
+    except Exception:
+        if conn:
+            conn.rollback()
+            conn.close()
+        return False
 
 def print_table(rows):
     for r in rows:
@@ -20,6 +38,7 @@ def print_table(rows):
 
 def out_bool(val):
     print("Success" if val else "Fail")
+
 
 # main setup (implement your case(s))
 
@@ -80,14 +99,11 @@ def main():
 if __name__ == "__main__":
     main()
 
+
 # command functions
 
 def import_data(folder):
-    conn = None
-    try:
-        conn = get_conn()
-        cur = conn.cursor()
-
+    def op(cur):
         drops = [
             "Hosting", "Approval", "Slot", "Event",
             "OnCampus", "OffCampus", "Venue",
@@ -225,10 +241,10 @@ def import_data(folder):
                     rows.append(row)
                 cur.executemany(query, rows)
 
-        def fix_bool(row, idx):
-            if row[idx] == "true":
+        def standardize_bool(row, idx):
+            if row[idx].lower() == "true":
                 row[idx] = 1
-            elif row[idx] == "false":
+            elif row[idx].lower() == "false":
                 row[idx] = 0
             return row
 
@@ -237,77 +253,76 @@ def import_data(folder):
         load("Participant.csv", "INSERT INTO Participant VALUES (%s,%s)")
         load("Administrator.csv", "INSERT INTO Administrator VALUES (%s,%s,%s)")
         load("Event.csv", "INSERT INTO Event VALUES (%s,%s,%s,%s,%s)")
-        load("Slot.csv", "INSERT INTO Slot VALUES (%s,%s,%s,%s)", convert=lambda r: fix_bool(r, 2))
+        load("Slot.csv", "INSERT INTO Slot VALUES (%s,%s,%s,%s)",
+             convert=lambda r: standardize_bool(r, 2))
         load("Venue.csv", "INSERT INTO Venue VALUES (%s,%s,%s,%s,%s)")
         load("OnCampus.csv", "INSERT INTO OnCampus VALUES (%s,%s)")
         load("OffCampus.csv", "INSERT INTO OffCampus VALUES (%s,%s)")
-        load("Hosting.csv", "INSERT INTO Hosting VALUES (%s,%s,%s)", convert=lambda r: fix_bool(r, 2))
+        load("Hosting.csv", "INSERT INTO Hosting VALUES (%s,%s,%s)",
+             convert=lambda r: standardize_bool(r, 2))
         load("Approval.csv", "INSERT INTO Approval VALUES (%s,%s,%s,%s)")
-
-        conn.commit()
-        conn.close()
         return True
-
-    except Exception:
-        if conn:
-            conn.rollback()
-            conn.close()
-        return False
+    return execute_txn(op)
     
 def insertAdmin(uid, email, username, joined, firstname, lastname):
-    conn = None
-    try:
-        conn = get_conn()
-        cur = conn.cursor()
-
+    def op(cur):
         cur.execute("""
             INSERT INTO User (uid, email, username, joined)
             VALUES (%s, %s, %s, %s)
         """, (uid, email, username, joined))
+
         cur.execute("""
             INSERT INTO Administrator (uid, firstname, lastname)
             VALUES (%s, %s, %s)
         """, (uid, firstname, lastname))
 
-        conn.commit()
-        conn.close()
         return True
-
-    except Exception:
-        if conn:
-            conn.rollback()
-            conn.close()
-        return False
+    return execute_txn(op)
 
 def addVenue(eid, vid, is_primary):
-    conn = None
-    try:
-        conn = get_conn()
-        cur = conn.cursor()
-
+    def op(cur):
         if is_primary:
             cur.execute("""
                 SELECT COUNT(*)
                 FROM Hosting
                 WHERE eid = %s AND is_primary = TRUE
             """, (eid,))
-            
-            count = cur.fetchone()[0]
-            if count > 0:
-                conn.close()
-                return False
+
+            primary_count = cur.fetchone()[0]
+            if primary_count > 0:
+                raise Exception("Primary already exists")
 
         cur.execute("""
             INSERT INTO Hosting (eid, vid, is_primary)
             VALUES (%s, %s, %s)
         """, (eid, vid, is_primary))
 
-        conn.commit()
-        conn.close()
         return True
+    return execute_txn(op)
 
-    except Exception:
-        if conn:
-            conn.rollback()
-            conn.close()
-        return False
+def reserveSlot(eid, snum, uid):
+    raise NotImplementedError()
+
+def cancelReservation(eid, snum, uid):
+    raise NotImplementedError()
+
+def updateEvent(eid, title, datetime):
+    raise NotImplementedError()
+
+def deleteOrganizer(uid):
+    raise NotImplementedError()
+
+def availableEvents(date):
+    raise NotImplementedError()
+
+def popularEventTypes(N):
+    raise NotImplementedError()
+
+def participantSchedule(uid):
+    raise NotImplementedError()
+
+def organizerStats(N):
+    raise NotImplementedError()
+
+def venueEvents(vid):
+    raise NotImplementedError()
