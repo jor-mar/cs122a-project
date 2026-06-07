@@ -18,88 +18,29 @@ def execute_txn(fn):
     try:
         conn = get_conn()
         cur = conn.cursor()
-
         result = fn(cur)
-
         conn.commit()
-        conn.close()
         return result
-
-    except Exception:
+    except mysql.connector.Error:
         if conn:
             conn.rollback()
-            conn.close()
         return False
+    finally:
+        if conn:
+            conn.close()
 
 def print_table(rows):
     for r in rows:
         print(",".join(str(x) if x is not None else "NULL" for x in r))
 
+def parse_bool(val):
+    return  {"true": True, "false": False}[val.lower()]
+
 def out_bool(val):
     print("Success" if val else "Fail")
 
 
-# main setup (implement your case(s))
-
-def main():
-    func = sys.argv[1]
-    args = sys.argv[2:]
-
-    match func:
-
-        case "import":
-            out_bool(import_data(args[0]))
-
-        case "insertAdmin":
-            uid = int(args[0])
-            email = args[1]
-            username = args[2]
-            joined = args[3]
-            firstname = args[4]
-            lastname = args[5]
-            out_bool(insertAdmin(uid, email, username, joined, firstname, lastname))
-
-        case "addVenue":
-            eid = int(args[0])
-            vid = int(args[1])
-            is_primary = args[2].lower() == "true"
-            out_bool(addVenue(eid, vid, is_primary))
-        
-        case "reserveSlot":
-            raise NotImplementedError()
-        
-        case "cancelReservation":
-            raise NotImplementedError()
-        
-        case "updateEvent":
-            raise NotImplementedError()
-        
-        case "deleteOrganizer":
-            raise NotImplementedError()
-        
-        case "availableEvents":
-            raise NotImplementedError()
-        
-        case "popularEventTypes":
-            raise NotImplementedError()
-        
-        case "participantSchedule":
-            raise NotImplementedError()
-        
-        case "organizerStats":
-            raise NotImplementedError()
-        
-        case "venueEvents":
-            raise NotImplementedError()
-        
-        case _:
-            print("Unknown function")
-
-if __name__ == "__main__":
-    main()
-
-
-# command functions
+# operation functions
 
 def import_data(folder):
     def op(cur):
@@ -240,25 +181,18 @@ def import_data(folder):
                     rows.append(row)
                 cur.executemany(query, rows)
 
-        def standardize_bool(row, idx):
-            if row[idx].lower() == "true":
-                row[idx] = 1
-            elif row[idx].lower() == "false":
-                row[idx] = 0
-            return row
-
         load("User.csv", "INSERT INTO User VALUES (%s,%s,%s,%s)")
         load("Organizer.csv", "INSERT INTO Organizer VALUES (%s,%s,%s)")
         load("Participant.csv", "INSERT INTO Participant VALUES (%s,%s)")
         load("Administrator.csv", "INSERT INTO Administrator VALUES (%s,%s,%s)")
         load("Event.csv", "INSERT INTO Event VALUES (%s,%s,%s,%s,%s)")
         load("Slot.csv", "INSERT INTO Slot VALUES (%s,%s,%s,%s)",
-             convert=lambda r: standardize_bool(r, 2))
+             convert=lambda r: (r[0], r[1], parse_bool(r[2]), r[3]))
         load("Venue.csv", "INSERT INTO Venue VALUES (%s,%s,%s,%s,%s)")
         load("OnCampus.csv", "INSERT INTO OnCampus VALUES (%s,%s)")
         load("OffCampus.csv", "INSERT INTO OffCampus VALUES (%s,%s)")
         load("Hosting.csv", "INSERT INTO Hosting VALUES (%s,%s,%s)",
-             convert=lambda r: standardize_bool(r, 2))
+             convert=lambda r: (r[0], r[1], parse_bool(r[2])))
         load("Approval.csv", "INSERT INTO Approval VALUES (%s,%s,%s,%s)")
         
         return True
@@ -290,7 +224,7 @@ def addVenue(eid, vid, is_primary):
 
             primary_count = cur.fetchone()[0]
             if primary_count > 0:
-                raise Exception("Primary already exists")
+                return False
 
         cur.execute("""
             INSERT INTO Hosting (eid, vid, is_primary)
@@ -326,3 +260,61 @@ def organizerStats(N):
 
 def venueEvents(vid):
     raise NotImplementedError()
+
+
+# main setup
+
+def main():
+    func = sys.argv[1]
+    args = sys.argv[2:]
+
+    if func == "import":
+        out_bool(import_data(args[0]))
+
+    elif func == "insertAdmin":
+        uid = int(args[0])
+        email = args[1]
+        username = args[2]
+        joined = args[3]
+        firstname = args[4]
+        lastname = args[5]
+        out_bool(insertAdmin(uid, email, username, joined, firstname, lastname))
+
+    elif func == "addVenue":
+        eid = int(args[0])
+        vid = int(args[1])
+        is_primary = parse_bool(args[2])
+        out_bool(addVenue(eid, vid, is_primary))
+    
+    elif func == "reserveSlot":
+        raise NotImplementedError()
+    
+    elif func == "cancelReservation":
+        raise NotImplementedError()
+    
+    elif func == "updateEvent":
+        raise NotImplementedError()
+    
+    elif func == "deleteOrganizer":
+        raise NotImplementedError()
+    
+    elif func == "availableEvents":
+        raise NotImplementedError()
+    
+    elif func == "popularEventTypes":
+        raise NotImplementedError()
+    
+    elif func == "participantSchedule":
+        raise NotImplementedError()
+    
+    elif func == "organizerStats":
+        raise NotImplementedError()
+    
+    elif func == "venueEvents":
+        raise NotImplementedError()
+    
+    else:
+        print("Unknown function")
+
+if __name__ == "__main__":
+    main()
