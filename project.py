@@ -8,8 +8,9 @@ import os
 
 def get_conn():
     return mysql.connector.connect(
-        user='test',
-        password='password',
+        host='localhost',
+        user='root',
+        password='I-lrct3now',
         database='cs122a'
     )
 
@@ -25,7 +26,8 @@ def execute_txn(fn):
         conn.close()
         return result
 
-    except Exception:
+    except Exception as e:
+        print(str(e))
         if conn:
             conn.rollback()
             conn.close()
@@ -67,13 +69,22 @@ def main():
             out_bool(addVenue(eid, vid, is_primary))
         
         case "reserveSlot":
-            raise NotImplementedError()
+            eid = int(args[0])
+            snum = int(args[1])
+            uid = int(args[2])
+            out_bool(reserveSlot(eid, snum, uid))
         
         case "cancelReservation":
-            raise NotImplementedError()
+            eid = int(args[0])
+            snum = int(args[1])
+            uid = int(args[2])
+            out_bool(cancelReservation(eid, snum, uid))
         
         case "updateEvent":
-            raise NotImplementedError()
+            eid = int(args[0])
+            title = args[1]
+            datetime = args[2]
+            out_bool(updateEvent(eid, title, datetime))
         
         case "deleteOrganizer":
             raise NotImplementedError()
@@ -95,9 +106,6 @@ def main():
         
         case _:
             print("Unknown function")
-
-if __name__ == "__main__":
-    main()
 
 
 # command functions
@@ -302,7 +310,25 @@ def addVenue(eid, vid, is_primary):
     return execute_txn(op)
 
 def reserveSlot(eid, snum, uid):
-    raise NotImplementedError()
+    def op(cur):
+        cur.execute("""
+            SELECT is_reserved
+            FROM Slot
+            WHERE eid = %s AND snum = %s
+        """, (eid, snum))
+
+        is_slot_reserved = cur.fetchone()[0]
+        if is_slot_reserved == 1:
+            raise Exception('Slot is already reserved')
+
+        cur.execute("""
+            UPDATE Slot
+            SET is_reserved = TRUE, uid = %s
+            WHERE eid = %s AND snum = %s
+        """, (uid, eid, snum))
+        return True
+
+    return execute_txn(op)
 
 def cancelReservation(eid, snum, uid):
     raise NotImplementedError()
@@ -327,3 +353,6 @@ def organizerStats(N):
 
 def venueEvents(vid):
     raise NotImplementedError()
+
+if __name__ == "__main__":
+    main()
