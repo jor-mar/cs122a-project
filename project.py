@@ -261,6 +261,7 @@ def import_data(folder):
         load("Hosting.csv", "INSERT INTO Hosting VALUES (%s,%s,%s)",
              convert=lambda r: standardize_bool(r, 2))
         load("Approval.csv", "INSERT INTO Approval VALUES (%s,%s,%s,%s)")
+        
         return True
     return execute_txn(op)
     
