@@ -4,7 +4,7 @@ import csv
 import os
 
 
-# utility helper functions
+# helper functions
 
 def get_conn():
     return mysql.connector.connect(
