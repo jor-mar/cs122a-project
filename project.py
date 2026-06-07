@@ -75,13 +75,16 @@ def main():
             raise NotImplementedError()
         
         case "deleteOrganizer":
-            raise NotImplementedError()
+            uid = int(args[0])
+            out_bool(deleteOrganizer(uid))
         
         case "availableEvents":
-            raise NotImplementedError()
+            date = args[0]
+            print_table(availableEvents(date))
         
         case "popularEventTypes":
-            raise NotImplementedError()
+            N = int(args[0])
+            print_table(popularEventTypes(N))
         
         case "participantSchedule":
             raise NotImplementedError()
@@ -94,9 +97,6 @@ def main():
         
         case _:
             print("Unknown function")
-
-if __name__ == "__main__":
-    main()
 
 
 # command functions
@@ -310,13 +310,47 @@ def updateEvent(eid, title, datetime):
     raise NotImplementedError()
 
 def deleteOrganizer(uid):
-    raise NotImplementedError()
+    def op(cur):
+        cur.execute("""
+                    DELETE FROM Organizer
+                    WHERE uid = %s
+                """, (uid,))
+        
+        if cur.rowcount == 0:
+            raise Exception("Organizer Not Found")
+        
+        return True
+    return execute_txn(op)
 
 def availableEvents(date):
-    raise NotImplementedError()
+    def op(cur):
+        cur.execute("""
+                    SELECT e.eid, e.title, e.type, e.datetime, COUNT(*) AS availableSlots
+                    FROM Event e
+                    JOIN Slot s on e.eid = s.eid
+                    WHERE e.datetime > %s
+                        AND s.is_reserved = FALSE
+                    GROUP BY e.eid, e.title, e.type, e.datetime
+                    ORDER BY e.datetime ASC, e.eid ASC
+                """, (date,))
+        
+        return cur.fetchall()
+    return execute_txn(op)
 
 def popularEventTypes(N):
-    raise NotImplementedError()
+    def op(cur):
+        cur.execute("""
+                    SELECT e.type, COUNT(*) AS reservedCount
+                    FROM Event e
+                    JOIN Slot s on e.eid = s.eid
+                    WHERE s.is_reserved = TRUE
+                    GROUP BY e.type
+                    HAVING COUNT(*) >= %s
+                    ORDER BY reservedCount DESC, e.type ASC
+                """, (N,))
+        
+        return cur.fetchall()
+    return execute_txn(op)
 
 def participantSchedule(uid):
     raise NotImplementedError()
@@ -326,3 +360,7 @@ def organizerStats(N):
 
 def venueEvents(vid):
     raise NotImplementedError()
+
+
+if __name__ == "__main__":
+    main()
