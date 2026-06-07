@@ -8,9 +8,8 @@ import os
 
 def get_conn():
     return mysql.connector.connect(
-        host='localhost',
-        user='root',
-        password='I-lrct3now',
+        user='test',
+        password='password',
         database='cs122a'
     )
 
@@ -26,8 +25,7 @@ def execute_txn(fn):
         conn.close()
         return result
 
-    except Exception as e:
-        print(str(e))
+    except Exception:
         if conn:
             conn.rollback()
             conn.close()
@@ -354,7 +352,27 @@ def cancelReservation(eid, snum, uid):
     return execute_txn(op)
 
 def updateEvent(eid, title, datetime):
-    raise NotImplementedError()
+    def op(cur):
+        cur.execute("""
+            SELECT EXISTS (
+                SELECT 1
+                FROM Event
+                WHERE eid = %s
+            )
+        """, (eid, ))
+
+        is_id_valid = cur.fetchone()[0]
+        if is_id_valid == 0:
+            raise Exception('Event ID does not exist')
+
+        cur.execute("""
+            UPDATE Event
+            SET title = %s, datetime = %s
+            WHERE eid = %s
+        """, (title, datetime, eid))
+
+        return True
+    return execute_txn(op)
 
 def deleteOrganizer(uid):
     raise NotImplementedError()
