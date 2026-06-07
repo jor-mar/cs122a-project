@@ -326,12 +326,32 @@ def reserveSlot(eid, snum, uid):
             SET is_reserved = TRUE, uid = %s
             WHERE eid = %s AND snum = %s
         """, (uid, eid, snum))
-        return True
 
+        return True
     return execute_txn(op)
 
 def cancelReservation(eid, snum, uid):
-    raise NotImplementedError()
+    def op(cur):
+        cur.execute("""
+            SELECT is_reserved, uid
+            FROM Slot
+            WHERE eid = %s AND snum = %s
+        """, (eid, snum))
+
+        is_slot_reserved, reserved_uid = cur.fetchone()
+        if is_slot_reserved == 0:
+            raise Exception('Slot is not reserved')
+        if is_slot_reserved == 1 and reserved_uid != uid:
+            raise Exception('Slot is reserved to a different user')
+
+        cur.execute("""
+            UPDATE Slot
+            SET is_reserved = FALSE, uid = NULL
+            WHERE eid = %s AND snum = %s
+        """, (eid, snum))
+
+        return True
+    return execute_txn(op)
 
 def updateEvent(eid, title, datetime):
     raise NotImplementedError()
