@@ -345,13 +345,49 @@ def popularEventTypes(N):
     return execute_txn(op)
 
 def participantSchedule(uid):
-    raise NotImplementedError()
+    def op(cur):
+        cur.execute("""
+            SELECT e.eid, e.title, e.type, e.datetime, r.snum,
+                   v.vid, v.street, v.city, v.state, v.zip
+            FROM Slot r
+            JOIN Event e ON r.eid = e.eid
+            LEFT JOIN (
+                SELECT h.eid, ve.vid, ve.street, ve.city, ve.state, ve.zip
+                FROM Hosting h
+                JOIN Venue ve ON h.vid = ve.vid
+                WHERE h.is_primary = TRUE
+            ) v ON e.eid = v.eid
+            WHERE r.uid = %s
+            ORDER BY e.datetime ASC
+        """, (uid,))
+        return cur.fetchall()
+    return execute_txn(op)
 
 def organizerStats(N):
-    raise NotImplementedError()
+    def op(cur):
+        cur.execute("""
+            SELECT u.uid, u.username, o.department, COUNT(e.eid) AS eventCount
+            FROM Organizer o
+            JOIN User u ON o.uid = u.uid
+            JOIN Event e ON o.uid = e.creator_uid
+            GROUP BY o.uid, u.username, o.department
+            HAVING COUNT(e.eid) >= %s
+            ORDER BY eventCount DESC, o.uid ASC
+        """, (N,))
+        return cur.fetchall()
+    return execute_txn(op)
 
 def venueEvents(vid):
-    raise NotImplementedError()
+    def op(cur):
+        cur.execute("""
+            SELECT e.eid, e.title, e.type, e.datetime, h.is_primary
+            FROM Hosting h
+            JOIN Event e ON h.eid = e.eid
+            WHERE h.vid = %s
+            ORDER BY e.datetime ASC, e.eid ASC
+        """, (vid,))
+        return cur.fetchall()
+    return execute_txn(op)
 
 
 # main setup
@@ -409,13 +445,13 @@ def main():
         print_table(popularEventTypes(N))
     
     elif func == "participantSchedule":
-        raise NotImplementedError()
+        print_table(participantSchedule(int(args[0])))
     
     elif func == "organizerStats":
-        raise NotImplementedError()
+        print_table(organizerStats(int(args[0])))
     
     elif func == "venueEvents":
-        raise NotImplementedError()
+        print_table(venueEvents(int(args[0])))
     
     else:
         print("Unknown function")
