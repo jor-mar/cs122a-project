@@ -242,7 +242,11 @@ def reserveSlot(eid, snum, uid):
             WHERE eid = %s AND snum = %s
         """, (eid, snum))
 
-        is_slot_reserved = cur.fetchone()[0]
+        row = cur.fetchone()
+        if row is None:
+            raise Exception("Slot not found")
+
+        is_slot_reserved = row[0]
         if is_slot_reserved:
             raise Exception('Slot is already reserved')
 
@@ -263,7 +267,11 @@ def cancelReservation(eid, snum, uid):
             WHERE eid = %s AND snum = %s
         """, (eid, snum))
 
-        is_slot_reserved, reserved_uid = cur.fetchone()
+        row = cur.fetchone()
+        if row is None:
+            raise Exception("Slot not found")
+
+        is_slot_reserved, reserved_uid = row
         if not is_slot_reserved:
             raise Exception('Slot is not reserved')
         if is_slot_reserved and reserved_uid != uid:
