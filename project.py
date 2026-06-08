@@ -235,13 +235,71 @@ def addVenue(eid, vid, is_primary):
     return execute_txn(op)
 
 def reserveSlot(eid, snum, uid):
-    raise NotImplementedError()
+    def op(cur):
+        cur.execute("""
+            SELECT is_reserved
+            FROM Slot
+            WHERE eid = %s AND snum = %s
+        """, (eid, snum))
+
+        is_slot_reserved = cur.fetchone()[0]
+        if is_slot_reserved == 1:
+            raise Exception('Slot is already reserved')
+
+        cur.execute("""
+            UPDATE Slot
+            SET is_reserved = TRUE, uid = %s
+            WHERE eid = %s AND snum = %s
+        """, (uid, eid, snum))
+
+        return True
+    return execute_txn(op)
 
 def cancelReservation(eid, snum, uid):
-    raise NotImplementedError()
+    def op(cur):
+        cur.execute("""
+            SELECT is_reserved, uid
+            FROM Slot
+            WHERE eid = %s AND snum = %s
+        """, (eid, snum))
+
+        is_slot_reserved, reserved_uid = cur.fetchone()
+        if is_slot_reserved == 0:
+            raise Exception('Slot is not reserved')
+        if is_slot_reserved == 1 and reserved_uid != uid:
+            raise Exception('Slot is reserved to a different user')
+
+        cur.execute("""
+            UPDATE Slot
+            SET is_reserved = FALSE, uid = NULL
+            WHERE eid = %s AND snum = %s
+        """, (eid, snum))
+
+        return True
+    return execute_txn(op)
 
 def updateEvent(eid, title, datetime):
-    raise NotImplementedError()
+    def op(cur):
+        cur.execute("""
+            SELECT EXISTS (
+                SELECT 1
+                FROM Event
+                WHERE eid = %s
+            )
+        """, (eid, ))
+
+        is_id_valid = cur.fetchone()[0]
+        if is_id_valid == 0:
+            raise Exception('Event ID does not exist')
+
+        cur.execute("""
+            UPDATE Event
+            SET title = %s, datetime = %s
+            WHERE eid = %s
+        """, (title, datetime, eid))
+
+        return True
+    return execute_txn(op)
 
 def deleteOrganizer(uid):
     raise NotImplementedError()
@@ -287,13 +345,22 @@ def main():
         out_bool(addVenue(eid, vid, is_primary))
     
     elif func == "reserveSlot":
-        raise NotImplementedError()
+        eid = int(args[0])
+        snum = int(args[1])
+        uid = int(args[2])
+        out_bool(reserveSlot(eid, snum, uid))
     
     elif func == "cancelReservation":
-        raise NotImplementedError()
+        eid = int(args[0])
+        snum = int(args[1])
+        uid = int(args[2])
+        out_bool(cancelReservation(eid, snum, uid))
     
     elif func == "updateEvent":
-        raise NotImplementedError()
+        eid = int(args[0])
+        title = args[1]
+        datetime = args[2]
+        out_bool(updateEvent(eid, title, datetime))
     
     elif func == "deleteOrganizer":
         raise NotImplementedError()
