@@ -29,12 +29,22 @@ def execute_txn(fn):
         if conn:
             conn.close()
 
+def execute_query(fn):
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        return fn(cur)
+    finally:
+        conn.close()
+
 def print_table(rows):
     for r in rows:
         print(",".join(str(x) if x is not None else "NULL" for x in r))
 
 def parse_bool(val):
-    return  {"true": True, "false": False}[val.lower()]
+    if val is None:
+        return None
+    return  {"true": True, 1: True, "false": False, 0: False}[val.lower()]
 
 def out_bool(val):
     print("Success" if val else "Fail")
@@ -55,7 +65,7 @@ def import_data(folder):
             cur.execute(f"DROP TABLE IF EXISTS {t}")
 
         cur.execute("""
-        CREATE TABLE User (
+        CREATE TABLE `User` (
             uid INT,
             email TEXT NOT NULL,
             username TEXT NOT NULL,
@@ -175,13 +185,13 @@ def import_data(folder):
                 reader = csv.reader(f)
                 rows = []
                 for row in reader:
-                    row = [None if x == "NULL" else x for x in row]
+                    row = [None if x.upper() == "NULL" else x for x in row]
                     if convert:
                         row = convert(row)
                     rows.append(row)
                 cur.executemany(query, rows)
 
-        load("User.csv", "INSERT INTO User VALUES (%s,%s,%s,%s)")
+        load("User.csv", "INSERT INTO `User` VALUES (%s,%s,%s,%s)")
         load("Organizer.csv", "INSERT INTO Organizer VALUES (%s,%s,%s)")
         load("Participant.csv", "INSERT INTO Participant VALUES (%s,%s)")
         load("Administrator.csv", "INSERT INTO Administrator VALUES (%s,%s,%s)")
@@ -201,7 +211,7 @@ def import_data(folder):
 def insertAdmin(uid, email, username, joined, firstname, lastname):
     def op(cur):
         cur.execute("""
-            INSERT INTO User (uid, email, username, joined)
+            INSERT INTO `User` (uid, email, username, joined)
             VALUES (%s, %s, %s, %s)
         """, (uid, email, username, joined))
 
@@ -335,7 +345,7 @@ def availableEvents(date):
                 """, (date,))
         
         return cur.fetchall()
-    return execute_txn(op)
+    return execute_query(op)
 
 def popularEventTypes(N):
     def op(cur):
@@ -350,7 +360,7 @@ def popularEventTypes(N):
                 """, (N,))
         
         return cur.fetchall()
-    return execute_txn(op)
+    return execute_query(op)
 
 def participantSchedule(uid):
     def op(cur):
@@ -370,7 +380,7 @@ def participantSchedule(uid):
             ORDER BY e.datetime ASC
         """, (uid,))
         return cur.fetchall()
-    return execute_txn(op)
+    return execute_query(op)
 
 def organizerStats(N):
     def op(cur):
@@ -384,7 +394,7 @@ def organizerStats(N):
             ORDER BY eventCount DESC, o.uid ASC
         """, (N,))
         return cur.fetchall()
-    return execute_txn(op)
+    return execute_query(op)
 
 def venueEvents(vid):
     def op(cur):
@@ -396,7 +406,7 @@ def venueEvents(vid):
             ORDER BY e.datetime ASC, e.eid ASC
         """, (vid,))
         return cur.fetchall()
-    return execute_txn(op)
+    return execute_query(op)
 
 
 # main setup
