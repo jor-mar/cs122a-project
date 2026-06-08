@@ -30,12 +30,17 @@ def execute_txn(fn):
             conn.close()
 
 def execute_query(fn):
-    conn = get_conn()
+    conn = None
     try:
+        conn = get_conn()
         cur = conn.cursor()
-        return fn(cur)
+        result = fn(cur)
+        return result
+    except Exception:
+        return []
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 def print_table(rows):
     for r in rows:
@@ -44,7 +49,10 @@ def print_table(rows):
 def parse_bool(val):
     if val is None:
         return None
-    return  {"true": True, 1: True, "false": False, 0: False}[val.lower()]
+    if isinstance(val, bool):
+        return val
+    v = str(val).lower()
+    return v == "true" or v == "1"
 
 def out_bool(val):
     print("Success" if val else "Fail")
@@ -189,7 +197,11 @@ def import_data(folder):
                     if convert:
                         row = convert(row)
                     rows.append(row)
-                cur.executemany(query, rows)
+                for r in rows:
+                    try:
+                        cur.execute(query, r)
+                    except Exception:
+                        raise Exception("Import failed")
 
         load("User.csv", "INSERT INTO `User` VALUES (%s,%s,%s,%s)")
         load("Organizer.csv", "INSERT INTO Organizer VALUES (%s,%s,%s)")
@@ -225,16 +237,20 @@ def insertAdmin(uid, email, username, joined, firstname, lastname):
 
 def addVenue(eid, vid, is_primary):
     def op(cur):
+
+        cur.execute("""
+            SELECT 1 FROM Hosting WHERE eid=%s AND vid=%s
+        """, (eid, vid))
+        if cur.fetchone():
+            raise Exception("Duplicate venue")
+
         if is_primary:
             cur.execute("""
-                SELECT COUNT(*)
-                FROM Hosting
-                WHERE eid = %s AND is_primary = TRUE
+                SELECT 1 FROM Hosting
+                WHERE eid=%s AND is_primary=TRUE
             """, (eid,))
-
-            primary_count = cur.fetchone()[0]
-            if primary_count > 0:
-                raise Exception("Multiple primaries")
+            if cur.fetchone():
+                raise Exception("Multiple primary venues")
 
         cur.execute("""
             INSERT INTO Hosting (eid, vid, is_primary)
