@@ -21,7 +21,7 @@ def execute_txn(fn):
         result = fn(cur)
         conn.commit()
         return result
-    except mysql.connector.Error:
+    except Exception:
         if conn:
             conn.rollback()
         return False
@@ -224,7 +224,7 @@ def addVenue(eid, vid, is_primary):
 
             primary_count = cur.fetchone()[0]
             if primary_count > 0:
-                return False
+                raise Exception("Multiple primaries")
 
         cur.execute("""
             INSERT INTO Hosting (eid, vid, is_primary)
@@ -243,7 +243,7 @@ def reserveSlot(eid, snum, uid):
         """, (eid, snum))
 
         is_slot_reserved = cur.fetchone()[0]
-        if is_slot_reserved == 1:
+        if is_slot_reserved:
             raise Exception('Slot is already reserved')
 
         cur.execute("""
@@ -264,9 +264,9 @@ def cancelReservation(eid, snum, uid):
         """, (eid, snum))
 
         is_slot_reserved, reserved_uid = cur.fetchone()
-        if is_slot_reserved == 0:
+        if not is_slot_reserved:
             raise Exception('Slot is not reserved')
-        if is_slot_reserved == 1 and reserved_uid != uid:
+        if is_slot_reserved and reserved_uid != uid:
             raise Exception('Slot is reserved to a different user')
 
         cur.execute("""
@@ -358,6 +358,7 @@ def participantSchedule(uid):
                 WHERE h.is_primary = TRUE
             ) v ON e.eid = v.eid
             WHERE r.uid = %s
+                AND r.is_reserved = TRUE
             ORDER BY e.datetime ASC
         """, (uid,))
         return cur.fetchall()
